@@ -90,13 +90,7 @@ export interface ArtworkScene {
   tilt: SheetTilt
 }
 
-const SHEET_KINDS = new Set(['small', 'large', 'hint', 'number'])
-
-export function isSheetCommand(command: DrawCommand): boolean {
-  return SHEET_KINDS.has(command.kind)
-}
-
-/** 45° steps tilt the drawn sheet. Quarter turns are handled by the grid. */
+/** 45° steps tilt the framed sheet. Quarter turns are handled by the grid. */
 export function sheetTilt(rotation: DisplayRotation): SheetTilt {
   const oblique = rotation % 90 === 45
   return {

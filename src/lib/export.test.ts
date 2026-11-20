@@ -125,6 +125,19 @@ describe('export', () => {
     expect(turned.largeTiles[0]).toMatchObject({ visualRow: 0, visualCol: 6 })
   })
 
+  it('rotates the frame with a 45 degree view', () => {
+    const svg = buildSvgString({
+      tiles: [{ row: 0, col: 0 }],
+      colors,
+      display: { ...DEFAULT_DISPLAY, rotation: 45 },
+    })
+    const group = svg.indexOf('<g transform="translate(500 500) rotate(45) scale(0.7071) translate(-500 -500)">')
+    const frame = svg.indexOf('fill="#3a332d"')
+    expect(group).toBeGreaterThan(-1)
+    expect(frame).toBeGreaterThan(group)
+    expect(svg.indexOf('</g>')).toBeGreaterThan(frame)
+  })
+
   it('hits large tiles before overlapping merge regions', () => {
     const display = { ...DEFAULT_DISPLAY, frame: false, gap: 8, rotation: 0 as const }
     const scene = composeArtwork({

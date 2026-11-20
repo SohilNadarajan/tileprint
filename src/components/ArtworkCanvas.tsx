@@ -5,7 +5,6 @@ import type { DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../t
 import {
   composeArtwork,
   hitTest,
-  isSheetCommand,
   paintHit,
   tiltTransform,
   VIEWBOX,
@@ -200,11 +199,8 @@ export function ArtworkCanvas({
       }
       onClick={interactive ? handleClick : undefined}
     >
-      {scene.commands.filter((command) => !isSheetCommand(command)).map((command) => drawCommand(command))}
       <g transform={tiltTransform(scene.tilt)}>
-      {scene.commands
-        .filter((command) => isSheetCommand(command))
-        .map((command) => drawCommand(command, scene.tilt.degrees))}
+      {scene.commands.map((command) => drawCommand(command, scene.tilt.degrees))}
       {hoverTile && hover?.kind === 'merge' ? (
         <rect
           x={hoverTile.x}

@@ -310,9 +310,11 @@ export default function App() {
           <div className="w-full max-w-[640px] lg:max-w-[min(680px,calc(100svh-13rem))]">
             <div
               className={
-                display.frame
-                  ? 'shadow-[0_30px_70px_-34px_rgba(48,32,16,0.6)]'
-                  : 'shadow-[0_24px_50px_-32px_rgba(48,32,16,0.45)] ring-1 ring-line'
+                display.rotation % 90 === 45
+                  ? undefined
+                  : display.frame
+                    ? 'shadow-[0_30px_70px_-34px_rgba(48,32,16,0.6)]'
+                    : 'shadow-[0_24px_50px_-32px_rgba(48,32,16,0.45)] ring-1 ring-line'
               }
             >
               {showCanvas ? (

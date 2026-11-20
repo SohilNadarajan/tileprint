@@ -3,7 +3,7 @@ import type { DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../t
 import { ENCODING_VERSION } from '../types/tileprint.ts'
 import { patternIdFromSerialization } from './fingerprint.ts'
 import { canonicalSerialization, serializeTiles, sortOrigins, validateCoverage } from './geometry.ts'
-import { composeArtwork, isSheetCommand, tiltTransform, VIEWBOX, type DrawCommand } from './render.ts'
+import { composeArtwork, tiltTransform, VIEWBOX, type DrawCommand } from './render.ts'
 import { assemblyTiles, type AssemblyTile } from './tileColors.ts'
 
 export const PNG_EXPORT_SIZE = 3000
@@ -134,16 +134,12 @@ export function buildSvgString(options: {
     swatches: options.paletteId ? paletteSwatches(options.paletteId) : undefined,
   })
   const title = options.title ? `\n  <title>${escapeXml(options.title)}</title>` : ''
-  const chrome = scene.commands.filter((command) => !isSheetCommand(command))
-  const sheet = scene.commands.filter((command) => isSheetCommand(command))
   const markup = (command: DrawCommand) =>
     command.type === 'text' ? renderText(command, scene.tilt.degrees) : renderCommand(command)
-  const sheetBody = sheet.map((command) => `    ${markup(command)}`).join('\n')
   const transform = tiltTransform(scene.tilt)
-  const group = transform
-    ? `  <g transform="${transform}">\n${sheetBody}\n  </g>`
-    : sheet.map((command) => `  ${markup(command)}`).join('\n')
-  const body = [...chrome.map((command) => `  ${markup(command)}`), group].filter(Boolean).join('\n')
+  const body = transform
+    ? `  <g transform="${transform}">\n${scene.commands.map((command) => `    ${markup(command)}`).join('\n')}\n  </g>`
+    : scene.commands.map((command) => `  ${markup(command)}`).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" width="${VIEWBOX}" height="${VIEWBOX}" shape-rendering="geometricPrecision">${title}\n${body}\n</svg>\n`
 }
 
