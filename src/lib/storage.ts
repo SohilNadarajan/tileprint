@@ -41,9 +41,13 @@ function isDisplay(value: unknown): value is DisplaySettings {
   return (
     isRecord(value) &&
     (value.rotation === 0 ||
+      value.rotation === 45 ||
       value.rotation === 90 ||
+      value.rotation === 135 ||
       value.rotation === 180 ||
-      value.rotation === 270) &&
+      value.rotation === 225 ||
+      value.rotation === 270 ||
+      value.rotation === 315) &&
     typeof value.outlines === 'boolean' &&
     typeof value.outlineColor === 'string' &&
     typeof value.outlineWidth === 'number' &&

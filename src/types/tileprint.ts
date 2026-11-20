@@ -19,8 +19,17 @@ export type TileColorMap = Record<string, string>
 
 export type Rotation = 0 | 90 | 180 | 270
 
+/** View angle. Quarter turns stay on the grid; the odd steps tilt the sheet. */
+export type DisplayRotation = 0 | 45 | 90 | 135 | 180 | 225 | 270 | 315
+
+export const DISPLAY_ROTATIONS: readonly DisplayRotation[] = [0, 45, 90, 135, 180, 225, 270, 315]
+
+export function quarterTurn(rotation: DisplayRotation): Rotation {
+  return (Math.floor(rotation / 90) * 90) as Rotation
+}
+
 export interface DisplaySettings {
-  rotation: Rotation
+  rotation: DisplayRotation
   outlines: boolean
   outlineColor: string
   outlineWidth: number

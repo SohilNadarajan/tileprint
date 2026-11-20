@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { changePalette, getPalette, PALETTES, swatchNumber } from '../config/palettes.ts'
 import { DEFAULT_DISPLAY, GRID_SIZE } from '../types/tileprint.ts'
-import type { Rotation, TileOrigin } from '../types/tileprint.ts'
+import type { DisplayRotation, TileOrigin } from '../types/tileprint.ts'
 import { buildExportDocument, buildSvgString } from './export.ts'
 import { generateFingerprint } from './fingerprint.ts'
 import { serializeTiles } from './geometry.ts'
@@ -73,7 +73,7 @@ const tiles: TileOrigin[] = [
   { row: 6, col: 1 },
 ]
 
-function sceneFor(rotation: Rotation, paints: Record<string, string>, showNumbers: boolean): ArtworkScene {
+function sceneFor(rotation: DisplayRotation, paints: Record<string, string>, showNumbers: boolean): ArtworkScene {
   const palette = getPalette('tant-blue')
   if (!palette) throw new Error('missing TANT Blue')
   return composeArtwork({
@@ -130,7 +130,7 @@ describe('TANT palettes', () => {
 
   it('draws one centered number on each physical tile, including after rotation', () => {
     const paints = { 'l:0,0': '#122F7A' }
-    const rotations: Rotation[] = [0, 90, 180, 270]
+    const rotations: DisplayRotation[] = [0, 90, 180, 270]
     const positions = rotations.map((rotation) => {
       const scene = sceneFor(rotation, paints, true)
       const physical = GRID_SIZE * GRID_SIZE - tiles.length * 3
@@ -166,6 +166,25 @@ describe('TANT palettes', () => {
     })
 
     expect(new Set(positions).size).toBe(4)
+  })
+
+  it('adds a 45 degree view tilt without changing the tile grid', () => {
+    const straight = sceneFor(0, {}, false)
+    const tilted = sceneFor(45, { 'l:0,0': '#122F7A' }, true)
+    const turned = sceneFor(135, {}, false)
+    expect(straight.tilt.degrees).toBe(0)
+    expect(tilted.tilt.degrees).toBe(45)
+    expect(turned.tilt.degrees).toBe(45)
+    expect(tilted.tilt.scale).toBeCloseTo(1 / Math.SQRT2, 4)
+    expect(tilted.largeTiles.map((tile) => tile.origin)).toEqual(straight.largeTiles.map((tile) => tile.origin))
+    expect(tilted.largeTiles.map((tile) => [tile.visualRow, tile.visualCol])).toEqual(
+      straight.largeTiles.map((tile) => [tile.visualRow, tile.visualCol]),
+    )
+    expect(turned.largeTiles.map((tile) => [tile.visualRow, tile.visualCol])).not.toEqual(
+      straight.largeTiles.map((tile) => [tile.visualRow, tile.visualCol]),
+    )
+    expect(numberAt(tilted, 'large', { row: 0, col: 0 })?.text).toBe('4')
+    expect(serializeTiles(tiles)).toBe('00034461')
   })
 
   it('leaves geometry and the fingerprint unchanged when numbers or colors change', async () => {

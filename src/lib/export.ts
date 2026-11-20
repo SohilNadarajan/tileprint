@@ -3,7 +3,7 @@ import type { DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../t
 import { ENCODING_VERSION } from '../types/tileprint.ts'
 import { patternIdFromSerialization } from './fingerprint.ts'
 import { canonicalSerialization, serializeTiles, sortOrigins, validateCoverage } from './geometry.ts'
-import { composeArtwork, VIEWBOX, type DrawCommand } from './render.ts'
+import { composeArtwork, isSheetCommand, tiltTransform, VIEWBOX, type DrawCommand } from './render.ts'
 import { assemblyTiles, type AssemblyTile } from './tileColors.ts'
 
 export const PNG_EXPORT_SIZE = 3000
@@ -112,8 +112,12 @@ function renderCommand(command: Exclude<DrawCommand, { type: 'text' }>): string 
   return `<rect ${attrs.join(' ')} />`
 }
 
-function renderText(command: DrawCommand & { type: 'text' }): string {
-  return `<text x="${formatNumber(command.x)}" y="${formatNumber(command.y)}" fill="${escapeXml(command.fill)}" font-size="${formatNumber(command.fontSize)}" text-anchor="middle" dominant-baseline="central" font-family="Outfit, sans-serif" pointer-events="none">${escapeXml(command.text)}</text>`
+function renderText(command: DrawCommand & { type: 'text' }, tiltDegrees = 0): string {
+  const upright =
+    tiltDegrees === 0
+      ? ''
+      : ` transform="rotate(${-tiltDegrees} ${formatNumber(command.x)} ${formatNumber(command.y)})"`
+  return `<text x="${formatNumber(command.x)}" y="${formatNumber(command.y)}" fill="${escapeXml(command.fill)}" font-size="${formatNumber(command.fontSize)}" text-anchor="middle" dominant-baseline="central" font-family="Outfit, sans-serif" pointer-events="none"${upright}>${escapeXml(command.text)}</text>`
 }
 
 export function buildSvgString(options: {
@@ -130,9 +134,16 @@ export function buildSvgString(options: {
     swatches: options.paletteId ? paletteSwatches(options.paletteId) : undefined,
   })
   const title = options.title ? `\n  <title>${escapeXml(options.title)}</title>` : ''
-  const body = scene.commands
-    .map((command) => `  ${command.type === 'text' ? renderText(command) : renderCommand(command)}`)
-    .join('\n')
+  const chrome = scene.commands.filter((command) => !isSheetCommand(command))
+  const sheet = scene.commands.filter((command) => isSheetCommand(command))
+  const markup = (command: DrawCommand) =>
+    command.type === 'text' ? renderText(command, scene.tilt.degrees) : renderCommand(command)
+  const sheetBody = sheet.map((command) => `    ${markup(command)}`).join('\n')
+  const transform = tiltTransform(scene.tilt)
+  const group = transform
+    ? `  <g transform="${transform}">\n${sheetBody}\n  </g>`
+    : sheet.map((command) => `  ${markup(command)}`).join('\n')
+  const body = [...chrome.map((command) => `  ${markup(command)}`), group].filter(Boolean).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" width="${VIEWBOX}" height="${VIEWBOX}" shape-rendering="geometricPrecision">${title}\n${body}\n</svg>\n`
 }
 

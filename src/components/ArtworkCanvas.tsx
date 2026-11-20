@@ -2,7 +2,17 @@ import { useMemo, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import type { Swatch } from '../config/palettes.ts'
 import type { DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../types/tileprint.ts'
-import { composeArtwork, hitTest, paintHit, VIEWBOX, type HitTarget, type PaintTarget } from '../lib/render.ts'
+import {
+  composeArtwork,
+  hitTest,
+  isSheetCommand,
+  paintHit,
+  tiltTransform,
+  VIEWBOX,
+  type DrawCommand,
+  type HitTarget,
+  type PaintTarget,
+} from '../lib/render.ts'
 
 interface ArtworkCanvasProps {
   tiles: readonly TileOrigin[]
@@ -18,6 +28,56 @@ interface ArtworkCanvasProps {
   onSplit?: (origin: TileOrigin) => void
   onMerge?: (origin: TileOrigin) => void
   onPaint?: (target: PaintTarget) => void
+}
+
+function drawCommand(command: DrawCommand, tiltDegrees = 0) {
+  if (command.type === 'circle') {
+    return (
+      <circle
+        key={command.id}
+        cx={command.cx}
+        cy={command.cy}
+        r={command.r}
+        fill={command.fill}
+        fillOpacity={command.fillOpacity}
+        pointerEvents="none"
+      />
+    )
+  }
+  if (command.type === 'text') {
+    return (
+      <text
+        key={command.id}
+        x={command.x}
+        y={command.y}
+        fill={command.fill}
+        fontSize={command.fontSize}
+        textAnchor="middle"
+        dominantBaseline="central"
+        pointerEvents="none"
+        transform={tiltDegrees === 0 ? undefined : `rotate(${-tiltDegrees} ${command.x} ${command.y})`}
+        style={{ fontFamily: 'Outfit, sans-serif' }}
+      >
+        {command.text}
+      </text>
+    )
+  }
+  return (
+    <rect
+      key={command.id}
+      x={command.x}
+      y={command.y}
+      width={command.w}
+      height={command.h}
+      fill={command.fill}
+      fillOpacity={command.fillOpacity}
+      stroke={command.stroke}
+      strokeWidth={command.strokeWidth}
+      strokeDasharray={command.strokeDasharray}
+      strokeOpacity={command.strokeOpacity}
+      pointerEvents="none"
+    />
+  )
 }
 
 function clientToSvg(
@@ -140,48 +200,11 @@ export function ArtworkCanvas({
       }
       onClick={interactive ? handleClick : undefined}
     >
-      {scene.commands.map((command) =>
-        command.type === 'circle' ? (
-          <circle
-            key={command.id}
-            cx={command.cx}
-            cy={command.cy}
-            r={command.r}
-            fill={command.fill}
-            fillOpacity={command.fillOpacity}
-            pointerEvents="none"
-          />
-        ) : command.type === 'text' ? (
-          <text
-            key={command.id}
-            x={command.x}
-            y={command.y}
-            fill={command.fill}
-            fontSize={command.fontSize}
-            textAnchor="middle"
-            dominantBaseline="central"
-            pointerEvents="none"
-            style={{ fontFamily: 'Outfit, sans-serif' }}
-          >
-            {command.text}
-          </text>
-        ) : (
-          <rect
-            key={command.id}
-            x={command.x}
-            y={command.y}
-            width={command.w}
-            height={command.h}
-            fill={command.fill}
-            fillOpacity={command.fillOpacity}
-            stroke={command.stroke}
-            strokeWidth={command.strokeWidth}
-            strokeDasharray={command.strokeDasharray}
-            strokeOpacity={command.strokeOpacity}
-            pointerEvents="none"
-          />
-        ),
-      )}
+      {scene.commands.filter((command) => !isSheetCommand(command)).map((command) => drawCommand(command))}
+      <g transform={tiltTransform(scene.tilt)}>
+      {scene.commands
+        .filter((command) => isSheetCommand(command))
+        .map((command) => drawCommand(command, scene.tilt.degrees))}
       {hoverTile && hover?.kind === 'merge' ? (
         <rect
           x={hoverTile.x}
@@ -222,6 +245,7 @@ export function ArtworkCanvas({
           pointerEvents="none"
         />
       ) : null}
+      </g>
     </svg>
   )
 }

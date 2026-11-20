@@ -10,7 +10,8 @@ import {
   serializeExportJson,
 } from '../lib/export.ts'
 import type { Swatch } from '../config/palettes.ts'
-import type { DisplaySettings, Rotation, TileColorMap, TileColors, TileOrigin } from '../types/tileprint.ts'
+import type { DisplayRotation, DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../types/tileprint.ts'
+import { DISPLAY_ROTATIONS } from '../types/tileprint.ts'
 
 interface EncoderPanelProps {
   text: string
@@ -45,7 +46,7 @@ interface EncoderPanelProps {
   onDisplay: (patch: Partial<DisplaySettings>) => void
 }
 
-const ROTATIONS: readonly Rotation[] = [0, 90, 180, 270]
+const ROTATIONS: readonly DisplayRotation[] = DISPLAY_ROTATIONS
 
 function Toggle({
   pressed,

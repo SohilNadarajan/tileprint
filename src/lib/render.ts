@@ -1,7 +1,7 @@
 import type { Swatch } from '../config/palettes.ts'
 import { swatchInk, swatchNumber } from '../config/palettes.ts'
-import type { DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../types/tileprint.ts'
-import { GRID_SIZE } from '../types/tileprint.ts'
+import type { DisplayRotation, DisplaySettings, TileColorMap, TileColors, TileOrigin } from '../types/tileprint.ts'
+import { GRID_SIZE, quarterTurn } from '../types/tileprint.ts'
 import { mergeCandidates, rotateOrigin, sortOrigins, unrotateCell } from './geometry.ts'
 import { tileHex } from './tileColors.ts'
 
@@ -73,6 +73,13 @@ interface TextCommand {
 
 export type DrawCommand = RectCommand | CircleCommand | TextCommand
 
+export interface SheetTilt {
+  degrees: 0 | 45
+  scale: number
+  cx: number
+  cy: number
+}
+
 export interface ArtworkScene {
   viewBox: number
   commands: DrawCommand[]
@@ -80,6 +87,43 @@ export interface ArtworkScene {
   smallTiles: LayoutTile[]
   hints: LayoutTile[]
   metrics: GridMetrics
+  tilt: SheetTilt
+}
+
+const SHEET_KINDS = new Set(['small', 'large', 'hint', 'number'])
+
+export function isSheetCommand(command: DrawCommand): boolean {
+  return SHEET_KINDS.has(command.kind)
+}
+
+/** 45° steps tilt the drawn sheet. Quarter turns are handled by the grid. */
+export function sheetTilt(rotation: DisplayRotation): SheetTilt {
+  const oblique = rotation % 90 === 45
+  return {
+    degrees: oblique ? 45 : 0,
+    scale: oblique ? Math.round((1 / Math.SQRT2) * 10000) / 10000 : 1,
+    cx: VIEWBOX / 2,
+    cy: VIEWBOX / 2,
+  }
+}
+
+export function tiltTransform(tilt: SheetTilt): string | undefined {
+  if (tilt.degrees === 0) return undefined
+  return `translate(${tilt.cx} ${tilt.cy}) rotate(${tilt.degrees}) scale(${tilt.scale}) translate(${-tilt.cx} ${-tilt.cy})`
+}
+
+/** Map a viewBox point back into the untilted sheet, where hit targets live. */
+export function untiltPoint(tilt: SheetTilt, x: number, y: number): { x: number; y: number } {
+  if (tilt.degrees === 0 || tilt.scale === 0) return { x, y }
+  const dx = (x - tilt.cx) / tilt.scale
+  const dy = (y - tilt.cy) / tilt.scale
+  const radians = (tilt.degrees * Math.PI) / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  return {
+    x: tilt.cx + dx * cos - dy * sin,
+    y: tilt.cy + dx * sin + dy * cos,
+  }
 }
 
 export interface HitTarget {
@@ -151,6 +195,7 @@ export function composeArtwork(options: {
 }): ArtworkScene {
   const { tiles, colors, display, includeHints } = options
   const paints = options.paints ?? {}
+  const gridRotation = quarterTurn(display.rotation)
   const metrics = gridMetrics(display)
   const commands: DrawCommand[] = []
   const tileStroke = strokeFor(display)
@@ -221,7 +266,7 @@ export function composeArtwork(options: {
 
   const covered = new Set<string>()
   const largeTiles: LayoutTile[] = sortOrigins(tiles).map((origin) => {
-    const visual = rotateOrigin(origin, display.rotation)
+    const visual = rotateOrigin(origin, gridRotation)
     for (let row = 0; row < 2; row += 1) {
       for (let col = 0; col < 2; col += 1) {
         covered.add(`${visual.row + row},${visual.col + col}`)
@@ -243,7 +288,7 @@ export function composeArtwork(options: {
       smallTiles.push({
         kind: 'small',
         ...tileRect({ row, col }, 1, metrics),
-        origin: unrotateCell(row, col, display.rotation),
+        origin: unrotateCell(row, col, gridRotation),
         visualRow: row,
         visualCol: col,
       })
@@ -288,7 +333,7 @@ export function composeArtwork(options: {
   const hints: LayoutTile[] = []
   if (includeHints) {
     for (const origin of mergeCandidates(tiles)) {
-      const visual = rotateOrigin(origin, display.rotation)
+      const visual = rotateOrigin(origin, gridRotation)
       const rect = tileRect(visual, 2, metrics)
       hints.push({
         kind: 'hint',
@@ -310,10 +355,13 @@ export function composeArtwork(options: {
     }
   }
 
-  return { viewBox: VIEWBOX, commands, largeTiles, smallTiles, hints, metrics }
+  return { viewBox: VIEWBOX, commands, largeTiles, smallTiles, hints, metrics, tilt: sheetTilt(display.rotation) }
 }
 
 export function paintHit(scene: ArtworkScene, x: number, y: number): PaintTarget | null {
+  const point = untiltPoint(scene.tilt, x, y)
+  x = point.x
+  y = point.y
   for (const tile of scene.largeTiles) {
     if (tile.origin && containsPoint(tile, x, y)) return { kind: 'large', origin: tile.origin }
   }
@@ -332,6 +380,9 @@ export function containsPoint(
 }
 
 export function hitTest(scene: ArtworkScene, x: number, y: number): HitTarget | null {
+  const point = untiltPoint(scene.tilt, x, y)
+  x = point.x
+  y = point.y
   for (const tile of scene.largeTiles) {
     if (tile.origin && containsPoint(tile, x, y)) {
       return { kind: 'split', origin: tile.origin }
